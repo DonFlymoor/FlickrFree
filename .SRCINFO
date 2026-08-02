@@ -1,0 +1,18 @@
+pkgbase = flickrfree
+	pkgdesc = Invisible Wayland client that holds an Always-VRR panel at max refresh on a static desktop (KDE system-tray icon + launcher)
+	pkgver = 1.0.0
+	pkgrel = 1
+	url = https://github.com/DonFlymoor/FlickrFree
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = base-devel
+	makedepends = wayland
+	makedepends = wayland-protocols
+	makedepends = systemd
+	depends = wayland
+	depends = systemd-libs
+	source = FlickrFree-1.0.0.tar.gz::https://github.com/DonFlymoor/FlickrFree/archive/v1.0.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = flickrfree
