@@ -1,5 +1,5 @@
 /*
- * keepalive - invisible VRR keep-alive for KWin/Wayland
+ * flickrfree - invisible VRR keep-alive for KWin/Wayland
  *
  * Presents a 1x1 fully-transparent frame continuously so an "Always" VRR panel
  * stays pinned at its max refresh on a static desktop instead of free-running
@@ -166,7 +166,7 @@ static void create_layer_surface(struct app *a)
     a->surface = wl_compositor_create_surface(a->compositor);
     a->layer_surface =
         zwlr_layer_shell_v1_get_layer_surface(a->layer_shell, a->surface,
-                                              a->output, a->layer, "keepalive");
+                                              a->output, a->layer, "flickrfree");
     zwlr_layer_surface_v1_add_listener(a->layer_surface, &ls_listener, a);
     zwlr_layer_surface_v1_set_size(a->layer_surface, 1, 1);
     zwlr_layer_surface_v1_set_anchor(a->layer_surface,
@@ -197,7 +197,7 @@ static void report_fps(struct app *a)
     double now = ts.tv_sec + ts.tv_nsec / 1e9;
     double elapsed = now - a->fps_anchor;
     if (elapsed >= 5.0) {
-        fprintf(stderr, "keepalive: %.0f fps (over %.0f s)\n",
+        fprintf(stderr, "flickrfree: %.0f fps (over %.0f s)\n",
                 (a->frames - a->fps_frames) / elapsed, elapsed);
         a->fps_anchor = now;
         a->fps_frames = a->frames;
@@ -218,7 +218,7 @@ static int run(struct app *a)
         int r = poll(fds, n, -1);
         if (r < 0) {
             if (errno == EINTR) continue;
-            fprintf(stderr, "keepalive: poll failed: %s\n", strerror(errno));
+            fprintf(stderr, "flickrfree: poll failed: %s\n", strerror(errno));
             break;
         }
 
@@ -226,7 +226,7 @@ static int run(struct app *a)
         if (fds[1].revents & POLLIN) {
             char b[64];
             while (read(g_self_pipe[0], b, sizeof b) > 0) { }
-            fprintf(stderr, "keepalive: signal %d, exiting\n", (int)g_sig);
+            fprintf(stderr, "flickrfree: signal %d, exiting\n", (int)g_sig);
             break;
         }
 
@@ -287,7 +287,7 @@ int main(int argc, char **argv)
 
     a.display = wl_display_connect(NULL);
     if (!a.display) {
-        fprintf(stderr, "keepalive: cannot connect to Wayland compositor "
+        fprintf(stderr, "flickrfree: cannot connect to Wayland compositor "
                         "(WAYLAND_DISPLAY set?)\n");
         return 1;
     }
@@ -296,14 +296,14 @@ int main(int argc, char **argv)
     wl_display_roundtrip(a.display); /* populate globals */
 
     if (!a.compositor || !a.layer_shell || !a.spm) {
-        fprintf(stderr, "keepalive: required globals missing "
+        fprintf(stderr, "flickrfree: required globals missing "
                         "(compositor=%d layer_shell=%d single_pixel=%d)\n",
                 a.compositor ? 1 : 0, a.layer_shell ? 1 : 0, a.spm ? 1 : 0);
         return 1;
     }
 
     create_layer_surface(&a);
-    fprintf(stderr, "keepalive: running on layer %s (1x1), Ctrl-C / SIGTERM to stop\n",
+    fprintf(stderr, "flickrfree: running on layer %s (1x1), Ctrl-C / SIGTERM to stop\n",
             a.layer == ZWLR_LAYER_SHELL_V1_LAYER_TOP ? "top" : "overlay");
 
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);

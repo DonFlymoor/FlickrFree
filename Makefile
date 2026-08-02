@@ -1,4 +1,4 @@
-# keepalive - invisible VRR keep-alive for KWin/Wayland
+# flickrfree - invisible VRR keep-alive for KWin/Wayland
 CC      ?= gcc
 CFLAGS  ?= -O2 -Wall -Wextra
 PKGS    := wayland-client
@@ -12,10 +12,10 @@ HDRS    := protocols/wlr-layer-shell-v1-client.h \
            protocols/single-pixel-buffer-v1-client.h \
            protocols/xdg-shell-client.h
 
-all: keepalive
+all: flickrfree
 
-keepalive: keepalive.c $(PROTO) $(HDRS)
-	$(CC) $(CFLAGS) -o $@ keepalive.c $(PROTO) $(shell pkg-config --cflags --libs $(PKGS))
+flickrfree: flickrfree.c $(PROTO) $(HDRS)
+	$(CC) $(CFLAGS) -o $@ flickrfree.c $(PROTO) $(shell pkg-config --cflags --libs $(PKGS))
 
 # --- regenerate protocol bindings (only needed if the XML versions change) ---
 protocols/wlr-layer-shell-v1-client.h: protocols/wlr-layer-shell-v1.xml
@@ -34,6 +34,6 @@ protocols/xdg-shell-protocol.c: $(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.
 	$(WAYLAND_SCANNER) private-code $< $@
 
 clean:
-	rm -f keepalive
+	rm -f flickrfree
 
 .PHONY: all clean
