@@ -32,9 +32,11 @@
 #include <poll.h>
 #include <fcntl.h>
 #include <time.h>
+#include <sys/file.h>
 #include <wayland-client.h>
 #include "protocols/wlr-layer-shell-v1-client.h"
 #include "protocols/single-pixel-buffer-v1-client.h"
+#include "sni.h"
 
 struct app {
     struct wl_display *display;
@@ -47,6 +49,8 @@ struct app {
     struct zwlr_layer_surface_v1 *layer_surface;
     struct wl_buffer *buffer;               /* 1x1 transparent single pixel */
     uint32_t layer;                         /* ZWLR_LAYER_SHELL_V1_LAYER_*  */
+    struct sni *tray;                       /* system-tray icon + Exit menu */
+    int lock_fd;                            /* single-instance lock         */
     bool started;                           /* first configure received     */
     bool cb_pending;                        /* frame callback in flight     */
     bool running;
@@ -207,13 +211,15 @@ static void report_fps(struct app *a)
 static int run(struct app *a)
 {
     int dispfd = wl_display_get_fd(a->display);
+    int busfd = a->tray ? sni_get_fd(a->tray) : -1;
     while (a->running) {
         wl_display_flush(a->display);
 
-        struct pollfd fds[2];
+        struct pollfd fds[3];
         int n = 0;
         fds[n].fd = dispfd;    fds[n].events = POLLIN; n++;
         fds[n].fd = g_self_pipe[0]; fds[n].events = POLLIN; n++;
+        fds[n].fd = busfd;     fds[n].events = POLLIN; n++;
 
         int r = poll(fds, n, -1);
         if (r < 0) {
@@ -227,6 +233,14 @@ static int run(struct app *a)
             char b[64];
             while (read(g_self_pipe[0], b, sizeof b) > 0) { }
             fprintf(stderr, "flickrfree: signal %d, exiting\n", (int)g_sig);
+            break;
+        }
+
+        /* tray (D-Bus) events -> drives the Exit menu action */
+        if (a->tray && busfd >= 0 && (fds[2].revents & POLLIN))
+            sni_process(a->tray);
+        if (a->tray && sni_wants_exit(a->tray)) {
+            fprintf(stderr, "flickrfree: tray Exit selected\n");
             break;
         }
 
@@ -267,6 +281,7 @@ int main(int argc, char **argv)
     memset(&a, 0, sizeof a);
     a.layer = ZWLR_LAYER_SHELL_V1_LAYER_TOP;
     a.running = true;
+    a.lock_fd = -1;
 
     int opt;
     while ((opt = getopt(argc, argv, "l:h")) != -1) {
@@ -278,6 +293,20 @@ int main(int argc, char **argv)
             break;
         case 'h': usage(argv[0]); return 0;
         default: usage(argv[0]); return 1;
+        }
+    }
+
+    /* single-instance guard: one running daemon (autostart + launcher may both fire) */
+    {
+        const char *rt = getenv("XDG_RUNTIME_DIR");
+        char lockpath[256];
+        snprintf(lockpath, sizeof lockpath, "%s/flickrfree.lock",
+                 rt && *rt ? rt : "/tmp");
+        a.lock_fd = open(lockpath, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+        if (a.lock_fd < 0 || flock(a.lock_fd, LOCK_EX | LOCK_NB) != 0) {
+            if (a.lock_fd >= 0) close(a.lock_fd);
+            fprintf(stderr, "flickrfree: another instance already running; exiting\n");
+            return 0;
         }
     }
 
@@ -303,6 +332,13 @@ int main(int argc, char **argv)
     }
 
     create_layer_surface(&a);
+
+    a.tray = sni_new("idea", "FlickrFree", NULL, &a);
+    if (a.tray)
+        fprintf(stderr, "flickrfree: tray icon ready (lightbulb) - right-click -> Exit\n");
+    else
+        fprintf(stderr, "flickrfree: warning - no system tray / D-Bus, running headless\n");
+
     fprintf(stderr, "flickrfree: running on layer %s (1x1), Ctrl-C / SIGTERM to stop\n",
             a.layer == ZWLR_LAYER_SHELL_V1_LAYER_TOP ? "top" : "overlay");
 
@@ -312,6 +348,8 @@ int main(int argc, char **argv)
     int rc = run(&a);
 
     /* cleanup */
+    if (a.tray) sni_destroy(a.tray);
+    if (a.lock_fd >= 0) close(a.lock_fd);
     if (a.buffer) wl_buffer_destroy(a.buffer);
     if (a.layer_surface) zwlr_layer_surface_v1_destroy(a.layer_surface);
     if (a.surface) wl_surface_destroy(a.surface);

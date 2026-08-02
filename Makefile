@@ -14,8 +14,8 @@ HDRS    := protocols/wlr-layer-shell-v1-client.h \
 
 all: flickrfree
 
-flickrfree: flickrfree.c $(PROTO) $(HDRS)
-	$(CC) $(CFLAGS) -o $@ flickrfree.c $(PROTO) $(shell pkg-config --cflags --libs $(PKGS))
+flickrfree: flickrfree.c sni.c sni.h $(PROTO) $(HDRS)
+	$(CC) $(CFLAGS) -o $@ flickrfree.c sni.c $(PROTO) $(shell pkg-config --cflags --libs $(PKGS)) -lsystemd
 
 # --- regenerate protocol bindings (only needed if the XML versions change) ---
 protocols/wlr-layer-shell-v1-client.h: protocols/wlr-layer-shell-v1.xml

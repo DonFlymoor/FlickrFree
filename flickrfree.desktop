@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=FlickrFree
+GenericName=VRR keep-alive
+Comment=Holds an Always-VRR panel at max refresh on a static desktop (invisible Wayland client with system tray icon)
+# Adjust Exec if flickrfree is not installed somewhere on your PATH.
+TryExec=/home/donf/workspace/FlickrFree/flickrfree
+Exec=/home/donf/workspace/FlickrFree/flickrfree
+Icon=idea
+Terminal=false
+Categories=Utility;
+Keywords=VRR;refresh;flicker;keepalive;display;
+X-KDE-StartupNotify=false
