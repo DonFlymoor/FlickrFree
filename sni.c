@@ -83,14 +83,15 @@ static int prop_get(sd_bus *bus, const char *path, const char *iface,
 
 /* ---------------- dbusmenu methods ---------------- */
 
+/* KDE's DBusMenuImporter expects GetLayout to return a TREE whose root is a
+ * single DBusMenuLayoutItem "(ia{sv}av)": id + a{sv} + an "av" array of
+ * variant-wrapped child DBusMenuLayoutItems. The menu items are added from
+ * root.children. (The canonical flat "a(ia{sv})" does NOT demarshal here.) */
 static int dbusmenu_GetLayout(sd_bus_message *m, void *ud, sd_bus_error *e)
 {
     struct sni *s = ud;
-    int32_t parent_id, recurse;
-    parent_id = 0; recurse = -1;
-    sd_bus_message_read(m, "ii", &parent_id, &recurse);
-    sd_bus_message_skip(m, "as");          /* propertyNames (unused) */
     (void)e;
+    sd_bus_message_skip(m, "iias");        /* parentId, recursionDepth, names */
 
     sd_bus_message *reply = NULL;
     int r = sd_bus_message_new_method_return(m, &reply);
@@ -98,29 +99,33 @@ static int dbusmenu_GetLayout(sd_bus_message *m, void *ud, sd_bus_error *e)
 
     sd_bus_message_append(reply, "u", (uint32_t)3);      /* revision */
 
-    sd_bus_message_open_container(reply, 'a', "(ia{sv})");
-    /* ---- root menu item (id 0) ---- */
-    sd_bus_message_open_container(reply, 'r', "ia{sv}");
-    sd_bus_message_append(reply, "i", 0);
-    sd_bus_message_open_container(reply, 'a', "{sv}");
-    sd_bus_message_append(reply, "{sv}", "label", "s", s->title);
-    sd_bus_message_append(reply, "{sv}", "enabled", "b", 1);
-    sd_bus_message_append(reply, "{sv}", "visible", "b", 1);
-    sd_bus_message_append(reply, "{sv}", "children-display", "s", "submenu");
+    /* ---- root DBusMenuLayoutItem: (ia{sv}av) ---- */
+    sd_bus_message_open_container(reply, 'r', "ia{sv}av");
+    sd_bus_message_append(reply, "i", 0);                /* root id */
+    sd_bus_message_open_container(reply, 'a', "{sv}");   /* root props (unused) */
     sd_bus_message_close_container(reply);
-    sd_bus_message_close_container(reply);
-    /* ---- "Exit" item (id 1) ---- */
-    sd_bus_message_open_container(reply, 'r', "ia{sv}");
-    sd_bus_message_append(reply, "i", 1);
-    sd_bus_message_open_container(reply, 'a', "{sv}");
-    sd_bus_message_append(reply, "{sv}", "label", "s", "Exit");
-    sd_bus_message_append(reply, "{sv}", "enabled", "b", 1);
-    sd_bus_message_append(reply, "{sv}", "visible", "b", 1);
-    sd_bus_message_append(reply, "{sv}", "type", "s", "standard");
-    sd_bus_message_close_container(reply);
-    sd_bus_message_close_container(reply);
-    sd_bus_message_close_container(reply); /* a(ia{sv}) */
+    /* root.children : av */
+    sd_bus_message_open_container(reply, 'a', "v");
+    {
+        /* -- child 1: "Exit" -- */
+        sd_bus_message_open_container(reply, 'v', "(ia{sv}av)");
+        sd_bus_message_open_container(reply, 'r', "ia{sv}av");
+        sd_bus_message_append(reply, "i", 1);
+        sd_bus_message_open_container(reply, 'a', "{sv}");
+        sd_bus_message_append(reply, "{sv}", "label", "s", "Exit");
+        sd_bus_message_append(reply, "{sv}", "enabled", "b", 1);
+        sd_bus_message_append(reply, "{sv}", "visible", "b", 1);
+        sd_bus_message_append(reply, "{sv}", "type", "s", "standard");
+        sd_bus_message_close_container(reply);           /* a{sv} */
+        sd_bus_message_open_container(reply, 'a', "v");  /* grandchildren: none */
+        sd_bus_message_close_container(reply);
+        sd_bus_message_close_container(reply);           /* struct */
+        sd_bus_message_close_container(reply);           /* variant */
+    }
+    sd_bus_message_close_container(reply);               /* av */
+    sd_bus_message_close_container(reply);               /* root struct */
 
+    (void)s;
     return sd_bus_send(NULL, reply, NULL);
 }
 
@@ -201,7 +206,7 @@ static const sd_bus_vtable menu_vtable[] = {
     SD_BUS_PROPERTY("TextDirection", "s", prop_get, 0, SD_BUS_VTABLE_PROPERTY_CONST),
     SD_BUS_PROPERTY("Status", "s", prop_get, 0, SD_BUS_VTABLE_PROPERTY_EMITS_CHANGE),
     SD_BUS_PROPERTY("IconThemePath", "s", prop_get, 0, SD_BUS_VTABLE_PROPERTY_CONST),
-    SD_BUS_METHOD("GetLayout", "iias", "ua(ia{sv})",
+    SD_BUS_METHOD("GetLayout", "iias", "u(ia{sv}av)",
                   dbusmenu_GetLayout, SD_BUS_VTABLE_UNPRIVILEGED),
     SD_BUS_METHOD("GetGroupProperties", "aias", "a(ia{sv})",
                   dbusmenu_GetGroupProperties, SD_BUS_VTABLE_UNPRIVILEGED),
